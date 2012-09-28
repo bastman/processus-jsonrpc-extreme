@@ -1,8 +1,8 @@
 <?php
 
-namespace Processus\Lib\JsonRpc2;
+namespace Processus\Lib\JsonRpc2\ProcsUs;
 
-    class ProcessusUtil
+    class Util
     {
 
         /**
@@ -42,5 +42,18 @@ namespace Processus\Lib\JsonRpc2;
         {
             return \Processus\ProcessusContext::getInstance()->getBootstrap();
         }
+
+        /**
+         * @return \Application\Core\Lib\Auth\FacebookAuth
+         */
+        public static function newProcessusFacebookAuth()
+        {
+
+            return new \Application\Core\Lib\Auth\FacebookAuth();
+        }
+
+
+
+
 }
 

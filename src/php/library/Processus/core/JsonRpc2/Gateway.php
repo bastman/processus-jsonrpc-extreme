@@ -7,7 +7,14 @@ namespace Processus\Lib\JsonRpc2;
         \Processus\Lib\JsonRpc2\Interfaces\GatewayInterface
     {
 
+        /**
+         * @var Interfaces\CryptModuleInterface
+         */
+        protected $_cryptModule;
 
+        /**
+         * @var bool
+         */
         protected $_isDebugEnabled = false;
 
         /**
@@ -21,7 +28,7 @@ namespace Processus\Lib\JsonRpc2;
         protected $_connection;
 
         /**
-         * @var \Processus\Lib\JsonRpc2\Interfaces\AuthInterface
+         * @var \Processus\Lib\JsonRpc2\Interfaces\AuthModuleInterface
          */
         protected $_authModule;
 
@@ -58,7 +65,8 @@ namespace Processus\Lib\JsonRpc2;
             'enabled' => true,
             'requestBatchMaxItems' => 100,
             'serverClassName' => '{{NAMESPACE}}\\Server',
-            'authClassName' => '{{NAMESPACE}}\\Auth',
+            'authModuleClassName' => '{{NAMESPACE}}\\AuthModule',
+            'cryptModuleClassName' => '{{NAMESPACE}}\\CryptModule',
         );
 
 
@@ -404,17 +412,56 @@ namespace Processus\Lib\JsonRpc2;
         // =========== RPC: QUEUE-ITEM ======================
 
         /**
+         * @param Interfaces\RpcInterface $rpc
+         * @return Gateway
+         */
+        protected function _onBeforeInvokeRpcQueueItem(
+            \Processus\Lib\JsonRpc2\Interfaces\RpcInterface $rpc
+        )
+        {
+            // your fancy hooks here
+
+
+            return $this;
+        }
+
+        /**
+         * @param Interfaces\RpcInterface $rpc
+         * @return Gateway
+         */
+        protected function _onAfterInvokeRpcQueueItem(
+            \Processus\Lib\JsonRpc2\Interfaces\RpcInterface $rpc
+        )
+        {
+            // your fancy hooks here
+
+
+            return $this;
+        }
+        /**
          * @param Rpc $rpc
          * @return Gateway
          */
-        protected function _processRpcQueueItem(Rpc $rpc)
+        protected function _processRpcQueueItem(
+            \Processus\Lib\JsonRpc2\Interfaces\RpcInterface $rpc
+        )
         {
             $rpc->setGateway($this);
             $rpc->setGatewayClassName(get_class($this));
 
+            $rpc->setMethod($rpc->getRequest()->getMethod());
+            $rpc->setParams($rpc->getRequest()->getParams());
+            // rpc.params may be overwritten by crypt module
+
+            $cryptModule = $this->getCryptModule();
+            $rpc->setCryptModuleClassName(get_class($cryptModule));
+            $rpc->setCryptModule($cryptModule);
+            $cryptModule->decryptRequest();
+
             $authModule = $this->getAuthModule();
             $rpc->setAuthModuleClassName(get_class($authModule));
             $rpc->setAuthModule($authModule);
+
 
             $rpcQueue = $this->getRpcQueue();
             $rpcQueue->addItem($rpc);
@@ -431,10 +478,13 @@ namespace Processus\Lib\JsonRpc2;
                 $rpc->getRequest()->getJsonrpc()
             );
 
-
             $server = $this->getServer();
             $rpc->setServerClassName(get_class($server));
             $server->setRpc($rpc);
+
+
+            $this->_onBeforeInvokeRpcQueueItem($rpc);
+
             $server->run();
 
             $response = $rpc->getResponse();
@@ -452,6 +502,11 @@ namespace Processus\Lib\JsonRpc2;
                     $rpc->getResult()
                 );
             }
+
+            $this->_onAfterInvokeRpcQueueItem($rpc);
+
+            $rpc->getCryptModule()
+                ->encryptResponse();
 
 
             return $this;
@@ -581,8 +636,6 @@ namespace Processus\Lib\JsonRpc2;
 
 
         // =========== GATEWAY: RUN ======================
-
-
 
 
         /**
@@ -974,10 +1027,6 @@ namespace Processus\Lib\JsonRpc2;
                 'error' => null,
             );
 
-            if ($isDebugEnabled) {
-                $responseDataMixin['debug'] = $this->_getResponseDataDebugInfo();
-            }
-
             foreach($responseDataMixin as $key => $value) {
                 $responseData[$key] = $value;
             }
@@ -1046,65 +1095,126 @@ namespace Processus\Lib\JsonRpc2;
         }
 
 
-        // =========== PROCESSUS: AUTH ======================
+
+
+
+
+
+
+
+        // =========== PROCESSUS: MISC ======================
+
+
+
+
 
         /**
-         * @return \Processus\Interfaces\InterfaceAuthModule $authModule
+         * @return Gateway|\Processus\Lib\JsonRpc2\Interfaces\GatewayInterface
          */
-        public function newAuthModule()
+        public function unsetRpcQueue()
         {
-            $authClassName = '' . $this->getConfigValue('authClassName');
+            $this->_rpcQueue = array();
 
-            $namespaceName =
-                \Processus\Lib\JsonRpc2\RpcUtil::getNamespaceName(
-                    $this
-                );
-
-
-            $authClassName = str_replace(
-                array(
-                    '{{NAMESPACE}}',
-                ),
-                array(
-                    $namespaceName,
-
-                ),
-                $authClassName
-            );
-
-            $authModule = null;
-            try {
-                /**
-                 * @var $authModule \Processus\Lib\JsonRpc2\Interfaces\AuthInterface
-                 */
-                $authModule = new $authClassName();
-
-            } catch(\Exception $e) {
-            }
-
-            if(!
-                ($authModule instanceof
-                    \Processus\Lib\JsonRpc2\Interfaces\AuthInterface)
-            ) {
-                throw new \Exception(
-                    GatewayErrorType::ERROR_GATEWAYCONFIG_INVALID_AUTHMODULE
-                );
-            }
-
-
-
-            return $authModule;
-
+            return $this;
         }
 
 
         /**
-         * @param \Processus\Lib\JsonRpc2\Interfaces\AuthInterface $authModule
-         * @return Gateway
+         * @param Interfaces\CryptModuleInterface $cryptModule
+         * @return Gateway|Interfaces\GatewayInterface
+         */
+        public function setCryptModule(
+            Interfaces\CryptModuleInterface $cryptModule
+        )
+        {
+            $this->_cryptModule = $cryptModule;
+
+            return $this;
+        }
+
+        /**
+         * @return Gateway|Interfaces\GatewayInterface
+         */
+        public function unsetCryptModule()
+        {
+            $this->_cryptModule = null;
+
+            return $this;
+        }
+
+        /**
+         * @return Interfaces\CryptModuleInterface
+         */
+        public function getCryptModule()
+        {
+            if(!$this->hasCryptModule()) {
+
+                $this->_cryptModule = $this->newCryptModule();
+
+            }
+
+            return $this->_cryptModule;
+        }
+
+        /**
+         * @return bool
+         */
+        public function hasCryptModule()
+        {
+            return (
+                $this->_cryptModule
+                    instanceof Interfaces\CryptModuleInterface
+            );
+        }
+
+        /**
+         * @return Interfaces\CryptModuleInterface
+         */
+        public function newCryptModule()
+        {
+
+            // 'cryptModuleClassName' => '{{NAMESPACE}}\\CryptModule',
+            $cryptModuleClassName = '' . $this->getConfigValue(
+                'cryptModuleClassName'
+            );
+
+           if(empty($cryptModuleClassName)) {
+               throw new \Exception(
+                   GatewayErrorType::ERROR_GATEWAYCONFIG_INVALID_CRYPTMODULE
+               );
+           }
+
+            $cryptModuleInstance = RpcUtil::newClassInstanceFromTemplateString(
+                $this,
+                $cryptModuleClassName,
+                array(),
+                false
+            );
+
+            if(!
+            ($cryptModuleInstance instanceof
+                \Processus\Lib\JsonRpc2\Interfaces\CryptModuleInterface)
+            ) {
+                throw new \Exception(
+                    GatewayErrorType::ERROR_GATEWAYCONFIG_INVALID_CRYPTMODULE
+                );
+            }
+
+            return $cryptModuleInstance;
+
+        }
+
+
+
+
+
+        /**
+         * @param Interfaces\AuthModuleInterface $authModule
+         * @return Gateway|Interfaces\GatewayInterface
          */
         public function setAuthModule(
-            \Processus\Lib\JsonRpc2\Interfaces\AuthInterface $authModule
-            )
+            Interfaces\AuthModuleInterface $authModule
+        )
         {
             $this->_authModule = $authModule;
 
@@ -1112,8 +1222,7 @@ namespace Processus\Lib\JsonRpc2;
         }
 
         /**
-         * @return Gateway
-         *
+         * @return Gateway|Interfaces\GatewayInterface
          */
         public function unsetAuthModule()
         {
@@ -1122,27 +1231,67 @@ namespace Processus\Lib\JsonRpc2;
             return $this;
         }
 
-
         /**
-         * @return null | \Processus\Lib\JsonRpc2\Interfaces\AuthInterface
+         * @return Interfaces\AuthModuleInterface
          */
         public function getAuthModule()
         {
-            if (!
-                ($this->_authModule
-                    instanceof
-                    \Processus\Lib\JsonRpc2\Interfaces\AuthInterface)
-            ) {
-                $authModule = $this->newAuthModule();
+            if(!$this->hasAuthModule()) {
 
-                $this->_authModule = $authModule;
+                $this->_authModule = $this->newAuthModule();
+
             }
 
-
-
             return $this->_authModule;
+        }
+
+        /**
+         * @return bool
+         */
+        public function hasAuthModule()
+        {
+            return (
+                $this->_authModule
+                    instanceof Interfaces\AuthModuleInterface
+            );
+        }
+
+        /**
+         * @return Interfaces\AuthModuleInterface
+         */
+        public function newAuthModule()
+        {
+
+            $authModuleClassName = '' . $this->getConfigValue(
+                'authModuleClassName'
+            );
+
+            if(empty($authModuleClassName)) {
+                throw new \Exception(
+                    GatewayErrorType::ERROR_GATEWAYCONFIG_INVALID_AUTHMODULE
+                );
+            }
+
+            $authModuleInstance = RpcUtil::newClassInstanceFromTemplateString(
+                $this,
+                $authModuleClassName,
+                array(),
+                false
+            );
+
+            if(!
+            ($authModuleInstance instanceof
+                \Processus\Lib\JsonRpc2\Interfaces\AuthModuleInterface)
+            ) {
+                throw new \Exception(
+                    GatewayErrorType::ERROR_GATEWAYCONFIG_INVALID_AUTHMODULE
+                );
+            }
+
+            return $authModuleInstance;
 
         }
+
 
         /**
          * @return Gateway
@@ -1155,7 +1304,7 @@ namespace Processus\Lib\JsonRpc2;
             if (!(
                 $authModule
                     instanceof
-                    \Processus\Lib\JsonRpc2\Interfaces\AuthInterface
+                    Interfaces\AuthModuleInterface
             )) {
 
                 throw new \Exception(
@@ -1169,72 +1318,7 @@ namespace Processus\Lib\JsonRpc2;
 
 
 
-        // =========== PROCESSUS: MISC ======================
 
-
-        /**
-         * @return array
-         */
-        protected function _getResponseDataDebugInfo()
-        {
-
-            $profiler =
-                \Processus\Lib\JsonRpc2\ProcessusUtil::getProcessusProfiler();
-            $system =
-                \Processus\Lib\JsonRpc2\ProcessusUtil::getProcessusSystem();
-            $serverParams =
-                \Processus\Lib\JsonRpc2\ProcessusUtil::
-                    getProcessusServerParams();
-            $bootstrap =
-                \Processus\Lib\JsonRpc2\ProcessusUtil::
-                    getProcessusBootstrap();
-
-            $memory = array(
-                'usage' => $system->getMemoryUsage(),
-                'usage_peak' => $system->getMemoryPeakUsage()
-            );
-
-            $app = array(
-                'start' => $profiler->applicationProfilerStart(),
-                'end' => $profiler->applicationProfilerEnd(),
-                'duration' => $profiler->applicationDuration()
-            );
-
-            $system = array(
-                'request_time' => $serverParams->getRequestTime()
-            );
-
-            $requireList = $bootstrap->getFilesRequireList();
-
-            $fileStack = array(
-                'list' => $requireList,
-                'total' => count($requireList)
-            );
-
-            $debugInfo = array(
-                'gateway' => get_class($this),
-                'server' => get_class($this->getServer()),
-                'memory' => $memory,
-                'app' => $app,
-                'system' => $system,
-                'profiling' => $profiler->getProfilerStack(),
-                'fileStack' => $fileStack,
-            );
-
-            return $debugInfo;
-
-        }
-
-
-        /**
-         * @return Gateway|\Processus\Lib\JsonRpc2\Interfaces\GatewayInterface
-         */
-        public function unsetRpcQueue()
-        {
-            $this->_rpcQueue = array();
-
-            return $this;
-        }
     }
 
 

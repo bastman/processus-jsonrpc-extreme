@@ -9,6 +9,20 @@ namespace Processus\Lib\JsonRpc2;
         /**
          * @var string
          */
+        protected $_method = '';
+        /**
+         * @var array
+         */
+        protected $_params = array();
+        /**
+         * @var null|array|mixed
+         */
+        protected $_authData = null;
+
+
+        /**
+         * @var string
+         */
         protected $_serverClassName = '';
         /**
          * @var string
@@ -19,6 +33,12 @@ namespace Processus\Lib\JsonRpc2;
          * @var string
          */
         protected $_authModuleClassName = '';
+
+        /**
+         * @var string
+         */
+        protected $_cryptModuleClassName = '';
+
 
         /**
          * @var string
@@ -89,9 +109,15 @@ namespace Processus\Lib\JsonRpc2;
         protected $_server;
 
         /**
-         * @var Interfaces\AuthInterface|null
+         * @var Interfaces\AuthModuleInterface|null
          */
         protected $_authModule;
+
+        /**
+         * @var Interfaces\CryptModuleInterface|null
+         */
+        protected $_cryptModule;
+
 
         /**
          * @return \Processus\Lib\JsonRpc2\Interfaces\RpcRequestVoInterface
@@ -635,17 +661,17 @@ namespace Processus\Lib\JsonRpc2;
         }
 
         /**
-         * @param Interfaces\AuthInterface $authModule
+         * @param Interfaces\AuthModuleInterface $authModule
          * @return Interfaces\RpcInterface|Rpc
          */
         public function setAuthModule(
-            \Processus\Lib\JsonRpc2\Interfaces\AuthInterface $authModule
+            Interfaces\AuthModuleInterface $authModule
         )
         {
             $result = $this;
 
             $this->_authModule = $authModule;
-
+            $authModule->setRpc($this);
             return $result;
         }
 
@@ -662,7 +688,7 @@ namespace Processus\Lib\JsonRpc2;
         }
 
         /**
-         * @return null|Interfaces\AuthInterface
+         * @return null|Interfaces\AuthModuleInterface
          */
         public function getAuthModule()
         {
@@ -677,7 +703,7 @@ namespace Processus\Lib\JsonRpc2;
             return (
                 $this->_authModule
                     instanceof
-                    \Processus\Lib\JsonRpc2\Interfaces\AuthInterface
+                    \Processus\Lib\JsonRpc2\Interfaces\AuthModuleInterface
             );
         }
 
@@ -795,6 +821,153 @@ namespace Processus\Lib\JsonRpc2;
         }
 
 
+        /**
+         * @param string $method
+         * @return Rpc
+         */
+        public function setMethod($method)
+        {
+            $this->_method = $method;
+
+            return $this;
+        }
+
+        /**
+         * @return string
+         */
+        public function getMethod()
+        {
+            return '' . $this->_method;
+        }
+
+        /**
+         * @return bool
+         */
+        public function hasMethod()
+        {
+            $result = false;
+
+            $value = $this->getMethod();
+            if(!is_string($value)) {
+
+                return $result;
+            }
+
+            return (!empty($value));
+
+        }
+
+        /**
+         * @param array $params
+         * @return Rpc
+         */
+        public function setParams($params = array())
+        {
+            $this->_params = $params;
+
+            return $this;
+        }
+
+        /**
+         * @return array
+         */
+        public function getParams()
+        {
+            $result= array();
+
+            $value = $this->_params;
+
+            if(!is_array($value)) {
+
+                return $result;
+            }
+
+            return $value;
+        }
+
+        /**
+         * @param array|mixed|null $authData
+         * @return Rpc
+         */
+        public function setAuthData($authData)
+        {
+            $this->_authData = $authData;
+
+            return $this;
+        }
+
+        /**
+         * @return array|mixed|null
+         */
+        public function getAuthData()
+        {
+
+            return $this->_authData;
+        }
+
+
+        /**
+         * @param string $cryptModuleClassName
+         * @return Interfaces\RpcInterface
+         */
+        public function setCryptModuleClassName($cryptModuleClassName)
+        {
+            $this->_cryptModuleClassName = $cryptModuleClassName;
+
+            return $this;
+        }
+
+        /**
+         * @return string
+         */
+        public function getCryptModuleClassName()
+        {
+            return (string)$this->_cryptModuleClassName;
+        }
+
+        /**
+         * @param Interfaces\CryptModuleInterface $cryptModule
+         * @return Interfaces\RpcInterface|Rpc
+         */
+        public function setCryptModule(
+            Interfaces\CryptModuleInterface $cryptModule
+        )
+        {
+            $this->_cryptModule = $cryptModule;
+            $cryptModule->setRpc($this);
+
+            return $this;
+        }
+
+        /**
+         * @return Interfaces\CryptModuleInterface|null
+         */
+        public function getCryptModule()
+        {
+            return $this->_cryptModule;
+        }
+
+        /**
+         * @return Interfaces\RpcInterface
+         */
+        public function unsetCryptModule()
+        {
+            $this->_cryptModule = null;
+
+            return $this;
+        }
+
+        /**
+         * @return bool
+         */
+        public function hasCryptModule()
+        {
+            return (
+                $this->_cryptModule
+                    instanceof
+                    Interfaces\CryptModuleInterface
+            );
+        }
     }
 
 

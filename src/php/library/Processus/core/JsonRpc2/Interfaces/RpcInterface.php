@@ -247,12 +247,12 @@ interface RpcInterface
     public function getAuthModuleClassName();
 
     /**
-     * @param AuthInterface $authModule
+     * @param AuthModuleInterface $authModule
      * @return RpcInterface
      */
-    public function setAuthModule(AuthInterface $authModule);
+    public function setAuthModule(AuthModuleInterface $authModule);
     /**
-     * @return AuthInterface|null
+     * @return AuthModuleInterface|null
      */
     public function getAuthModule();
     /**
@@ -264,6 +264,39 @@ interface RpcInterface
      * @return bool
      */
     public function hasAuthModule();
+
+
+
+    /**
+     * @param string $cryptModuleClassName
+     * @return RpcInterface
+     */
+    public function setCryptModuleClassName($cryptModuleClassName);
+
+    /**
+     * @return string
+     */
+    public function getCryptModuleClassName();
+
+    /**
+     * @param CryptModuleInterface $cryptModule
+     * @return RpcInterface
+     */
+    public function setCryptModule(CryptModuleInterface $cryptModule);
+    /**
+     * @return CryptModuleInterface|null
+     */
+    public function getCryptModule();
+    /**
+     * @return RpcInterface
+     */
+    public function unsetCryptModule();
+
+    /**
+     * @return bool
+     */
+    public function hasCryptModule();
+
 
 
     /**
@@ -324,5 +357,52 @@ interface RpcInterface
      * @return bool
      */
     public function hasException();
+
+
+
+    /**
+     * @param string $method
+     * @return RpcInterface
+     */
+    public function setMethod($method);
+
+
+    /**
+     * @return string
+     */
+    public function getMethod();
+
+    /**
+     * @return bool
+     */
+    public function hasMethod();
+
+    /**
+     * @param array $params
+     * @return RpcInterface
+     */
+    public function setParams($params = array());
+
+
+    /**
+     * @return array
+     */
+    public function getParams();
+
+
+    /**
+     * @param array|mixed|null $authData
+     * @return RpcInterface
+     */
+    public function setAuthData($authData);
+
+
+    /**
+     * @return array|mixed|null
+     */
+    public function getAuthData();
+
+
+
 
 }

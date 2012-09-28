@@ -310,6 +310,145 @@ class RpcUtil
         return $result;
 
     }
+
+    /**
+     * @param string|object $class
+     * @param bool $marshallExceptions
+     * @return \ReflectionClass
+     * @throws \Exception
+     */
+    public static function newReflectionClass($class, $marshallExceptions)
+    {
+        $result = null;
+
+        $marshallExceptions = ($marshallExceptions===true);
+
+        try {
+
+            if (
+                ((is_string($class)) && (!empty($class)))
+                || (is_object($class))
+            ) {
+
+                $reflectionClass = new \ReflectionClass($class);
+
+                return $reflectionClass;
+            }
+
+            if($marshallExceptions) {
+
+                throw new \Exception(
+                    'Invalid parameter class at '.__METHOD__
+                );
+            }
+
+            return $result;
+
+        } catch(\Exception $e) {
+
+            if($marshallExceptions) {
+
+                throw $e;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param object $namespaceScope
+     * @param string $classNameTemplate
+     * @param array $methodArgs
+     * @param bool $marshallExceptions
+     * @return null|object
+     * @throws \Exception
+     */
+    public static function newClassInstanceFromTemplateString(
+        $namespaceScope,
+        $classNameTemplate,
+        $methodArgs = array(),
+        $marshallExceptions
+    )
+    {
+
+
+
+        $marshallExceptions = ($marshallExceptions===true);
+
+        if(!is_array($methodArgs)) {
+            $methodArgs = array();
+        }
+
+        $instance = null;
+
+        try {
+            $namespaceName = $namespaceScope;
+            if(!is_string($namespaceScope)) {
+                $namespaceName = self::getNamespaceName($namespaceScope);
+            }
+
+            $className = str_replace(
+                array(
+                    '{{NAMESPACE}}',
+                    '.'
+                ),
+                array(
+                    $namespaceName,
+                    '\\'
+                ),
+                $classNameTemplate
+            );
+
+            if(empty($className)) {
+
+                if($marshallExceptions) {
+
+                    throw new \Exception('Invalid className');
+                }
+
+                return $instance;
+            }
+
+            if(count($methodArgs)<1) {
+
+                if(class_exists($className)) {
+
+                    $instance = new $className();
+
+                }
+
+                return $instance;
+            }
+
+
+            $reflectionClass = self::newReflectionClass($className, false);
+
+            if($reflectionClass instanceof \ReflectionClass) {
+
+                $instance = $reflectionClass->newInstanceArgs($methodArgs);
+
+                return $instance;
+
+            }
+
+            if($marshallExceptions) {
+
+                throw new \Exception('Class not found');
+            }
+
+
+        } catch(\Exception $e) {
+
+            if($marshallExceptions) {
+
+                throw $e;
+            }
+
+        }
+
+        return $instance;
+
+    }
 }
 
 

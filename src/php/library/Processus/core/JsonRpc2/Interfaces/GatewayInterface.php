@@ -59,4 +59,37 @@ interface GatewayInterface
 
 
 
+
+
+
+    /**
+     * @param $cryptModule CryptModuleInterface
+     * @return GatewayInterface
+     */
+    public function setCryptModule(CryptModuleInterface $cryptModule);
+
+    /**
+     * @return GatewayInterface
+     */
+    public function unsetCryptModule();
+    /**
+     *
+     * @return CryptModuleInterface
+     */
+    public function getCryptModule();
+
+    /**
+     * @return bool
+     */
+    public function hasCryptModule();
+
+    /**
+     * @return CryptModuleInterface
+     */
+    public function newCryptModule();
+
+
+
+
+
 }

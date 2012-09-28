@@ -5,7 +5,7 @@ namespace Application\JsonRpc2\V1\Seb;
 
 class Gateway
     extends
-    \Processus\Lib\JsonRpc2\Gateway
+    \Processus\Lib\JsonRpc2\ProcsUs\Gateway
     {
 
         /**
@@ -23,8 +23,8 @@ class Gateway
             'enabled' => true,
             'requestBatchMaxItems' => 100,
             'serverClassName' => '{{NAMESPACE}}\\Server',
-            'authClassName' => '{{NAMESPACE}}\\Auth',
-
+            'authModuleClassName' => '{{NAMESPACE}}\\AuthModule',
+            'cryptModuleClassName' => '{{NAMESPACE}}\\CryptModule',
         );
 
 
