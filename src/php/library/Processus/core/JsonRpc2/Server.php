@@ -239,8 +239,7 @@ class Server
             $this->_validateRpcParams($rpcParams);
             $this->_mapServiceMethodArgs($rpcParams);
 
-            // (4) AuthCheck
-            $this->_requireAuth();
+
 
             // (5) invoke
             $this->_invokeServiceMethod();
@@ -258,36 +257,6 @@ class Server
         return $this;
     }
 
-
-    /**
-     * @return Server
-     * @throws \Exception
-     */
-    protected function _requireAuth()
-    {
-        $result = $this;
-
-        $rpc = $this->getRpc();
-
-        if (!$rpc->hasAuthModule()) {
-
-            return $result;
-        }
-
-
-
-        $authModule = $rpc->getAuthModule();
-
-        if ($authModule->isAuthorized()) {
-
-            return $result;
-        }
-
-        throw new \Exception(
-            GatewayErrorType::ERROR_GATEWAY_AUTH_REQUIRED
-        );
-
-    }
 
 
     /**

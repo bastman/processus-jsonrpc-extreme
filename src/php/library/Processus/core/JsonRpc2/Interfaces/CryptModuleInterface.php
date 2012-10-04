@@ -42,5 +42,16 @@ interface CryptModuleInterface
      */
     public function encryptResponse();
 
+    /**
+     * @return CryptModuleInterface
+     */
+    public function signResponse();
+
+    /**
+     * @return CryptModuleInterface
+     */
+    public function validateRequestSignature();
+
+
 
 }

@@ -72,4 +72,80 @@ class CryptModule
 
         return $this;
     }
+
+    /**
+     * @return CryptModule|Interfaces\CryptModuleInterface
+     */
+    public function signResponse()
+    {
+        $result = $this;
+
+        $secret = 'secret';
+
+
+        $rpc = $this->getRpc();
+
+        $rpcResult = $rpc->getResult();
+
+        $signature = \Processus\Lib\JsonRpc2\RpcUtil::
+            createRequestSignature(
+            array(
+                'result' =>$rpcResult,
+            ),
+            array(
+                'result'
+            ),
+            $secret,
+            'HMAC-SHA256',
+            time()
+        );
+        $rpc->getResponse()
+            ->setDataKey('signature', $signature);
+
+        return $result;
+    }
+
+
+    /**
+     * @return CryptModule|Interfaces\CryptModuleInterface
+     */
+    public function validateRequestSignature()
+    {
+        $result = $this;
+
+        $secret = 'secret';
+
+        $rpc = $this->getRpc();
+
+        $sigData = array(
+            'method' => $rpc->getRequest()
+                ->getDataKey('method'),
+            'params' => $rpc->getRequest()
+                ->getDataKey('params'),
+        );
+        $sigKeys = array_keys($sigData);
+
+        $signature = $rpc->getRequest()
+            ->getDataKey('signature');
+
+        $signatureIsValid = \Processus\Lib\JsonRpc2\RpcUtil::
+            validateSignedRequest(
+            $signature,
+            $sigData,
+            $sigKeys,
+            $secret,
+            'HMAC-SHA256'
+        );
+
+        if(!$signatureIsValid) {
+
+            throw new \Exception(
+                'Invalid rpc.signature '.get_class($this).__METHOD__
+            );
+        }
+
+        return $result;
+    }
+
+
 }

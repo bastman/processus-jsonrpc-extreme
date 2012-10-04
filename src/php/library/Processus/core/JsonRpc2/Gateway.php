@@ -8,6 +8,11 @@ namespace Processus\Lib\JsonRpc2;
     {
 
         /**
+         * @var string|null
+         */
+        protected $_apiNamespaceName=null;
+
+        /**
          * @var Interfaces\CryptModuleInterface
          */
         protected $_cryptModule;
@@ -64,9 +69,11 @@ namespace Processus\Lib\JsonRpc2;
         protected $_config = array(
             'enabled' => true,
             'requestBatchMaxItems' => 100,
+
             'serverClassName' => '{{NAMESPACE}}\\Server',
             'authModuleClassName' => '{{NAMESPACE}}\\AuthModule',
             'cryptModuleClassName' => '{{NAMESPACE}}\\CryptModule',
+
         );
 
 
@@ -108,6 +115,52 @@ namespace Processus\Lib\JsonRpc2;
         }
 
 
+        /**
+         * @return bool
+         */
+        public function hasApiNamespaceName()
+        {
+            return (
+                (is_string($this->_apiNamespaceName))
+                    && (!empty($this->_apiNamespaceName))
+            );
+        }
+
+        /**
+         * @param string $namespaceName
+         * @return Gateway
+         */
+        public function setApiNamespaceName($namespaceName)
+        {
+            $this->_apiNamespaceName = (string)$namespaceName;
+
+            return $this;
+        }
+
+        /**
+         * @return Gateway
+         */
+        public function unsetApiNamespaceName()
+        {
+            $this->_apiNamespaceName = null;
+
+            return $this;
+        }
+
+        /**
+         * @return null|string
+         */
+        public function getApiNamespaceName()
+        {
+            if(!$this->hasApiNamespaceName()) {
+
+                $reflectionClass = new \ReflectionClass($this);
+                $this->_apiNamespaceName =
+                    $reflectionClass->getNamespaceName();
+            }
+
+            return $this->_apiNamespaceName;
+        }
 
 
 
@@ -119,33 +172,14 @@ namespace Processus\Lib\JsonRpc2;
         public function newServer()
         {
             $serverClassName = '' . $this->getConfigValue('serverClassName');
-
-            $namespaceName =
-                \Processus\Lib\JsonRpc2\RpcUtil::getNamespaceName(
-                $this
-            );
-
             $serverClassName = str_replace(
-                array(
-                    '{{NAMESPACE}}',
-                ),
-                array(
-                    $namespaceName,
+                '{{NAMESPACE}}',
+                $this->getApiNamespaceName(),
 
-                ),
                 $serverClassName
             );
+            $server = new $serverClassName();
 
-            try {
-
-                /**
-                 * @var $server \Processus\Lib\JsonRpc2\Interfaces\ServerInterface $server
-                 */
-                $server = new $serverClassName();
-
-            } catch(\Exception $e) {
-                // NOP
-            }
 
             if(!
             ($server instanceof
@@ -446,22 +480,14 @@ namespace Processus\Lib\JsonRpc2;
             \Processus\Lib\JsonRpc2\Interfaces\RpcInterface $rpc
         )
         {
+            $result = $this;
+
             $rpc->setGateway($this);
             $rpc->setGatewayClassName(get_class($this));
 
             $rpc->setMethod($rpc->getRequest()->getMethod());
             $rpc->setParams($rpc->getRequest()->getParams());
             // rpc.params may be overwritten by crypt module
-
-            $cryptModule = $this->getCryptModule();
-            $rpc->setCryptModuleClassName(get_class($cryptModule));
-            $rpc->setCryptModule($cryptModule);
-            $cryptModule->decryptRequest();
-
-            $authModule = $this->getAuthModule();
-            $rpc->setAuthModuleClassName(get_class($authModule));
-            $rpc->setAuthModule($authModule);
-
 
             $rpcQueue = $this->getRpcQueue();
             $rpcQueue->addItem($rpc);
@@ -478,10 +504,88 @@ namespace Processus\Lib\JsonRpc2;
                 $rpc->getRequest()->getJsonrpc()
             );
 
+
+
+            $cryptModule = $this->getCryptModule();
+            $rpc->setCryptModuleClassName(get_class($cryptModule));
+            $rpc->setCryptModule($cryptModule);
+
+
+            $authModule = $this->getAuthModule();
+            // we need a new instance aut auth Module for each rpc item
+            $authModuleClassName = get_class($authModule);
+            $rpc->setAuthModuleClassName(get_class($authModule));
+            $authModule = new $authModuleClassName();
+            $rpc->setAuthModule($authModule);
+
             $server = $this->getServer();
             $rpc->setServerClassName(get_class($server));
             $server->setRpc($rpc);
 
+
+            // security: try decrypt request
+            $decryptRequestException = null;
+            try {
+
+                $cryptModule->decryptRequest();
+                $cryptModule->validateRequestSignature();
+
+            } catch(\Exception $e) {
+
+                $decryptRequestException = $e;
+
+            }
+
+            if($decryptRequestException
+                instanceof \Exception) {
+
+                $rpc->getResponse()
+                    ->setException(
+                    $decryptRequestException
+                );
+                $rpc->getResponse()
+                    ->setResult(null);
+
+                $rpc->getCryptModule()
+                    ->signResponse();
+                $rpc->getCryptModule()
+                    ->encryptResponse();
+
+                return $result;
+            }
+
+
+            // auth check
+            $authException = null;
+            try {
+
+                $this->_requireAuth($rpc);
+
+            } catch(\Exception $e) {
+
+                $authException = $e;
+
+            }
+
+            if($authException
+                instanceof \Exception) {
+
+                $rpc->getResponse()
+                    ->setException(
+                    $authException
+                );
+                $rpc->getResponse()
+                    ->setResult(null);
+
+                $rpc->getCryptModule()
+                    ->signResponse();
+                $rpc->getCryptModule()
+                    ->encryptResponse();
+
+                return $result;
+            }
+
+            // everything fine? route to server
 
             $this->_onBeforeInvokeRpcQueueItem($rpc);
 
@@ -506,13 +610,42 @@ namespace Processus\Lib\JsonRpc2;
             $this->_onAfterInvokeRpcQueueItem($rpc);
 
             $rpc->getCryptModule()
+                ->signResponse();
+            $rpc->getCryptModule()
                 ->encryptResponse();
 
-
-            return $this;
+            return $result;
         }
 
+        /**
+         * @param Interfaces\RpcInterface $rpc
+         * @return Gateway
+         * @throws \Exception
+         */
+        protected function _requireAuth(
+            \Processus\Lib\JsonRpc2\Interfaces\RpcInterface $rpc
+        )
+        {
+            $result = $this;
 
+            if (!$rpc->hasAuthModule()) {
+
+                return $result;
+            }
+
+            $authModule = $rpc->getAuthModule();
+            $authModule->setRpc($rpc);
+
+            if ($authModule->isAuthorized()) {
+
+                return $result;
+            }
+
+            throw new \Exception(
+                GatewayErrorType::ERROR_GATEWAY_AUTH_REQUIRED
+            );
+
+        }
         // =========== RESPONSE:  ======================
 
         /**
@@ -661,9 +794,10 @@ namespace Processus\Lib\JsonRpc2;
 
                 // parse request: is request batched ?
                 $batchItemCount = (int)count($requestData);
-                $isAssocArray = \Processus\Lib\JsonRpc2\RpcUtil::isAssocArray(
-                    $requestData
-                );
+                $isAssocArray = \Processus\Lib\JsonRpc2\RpcUtil::
+                    isAssocArray(
+                        $requestData
+                    );
                 $isBatched = (!$isAssocArray);
 
                 $rpcQueue = $this->getRpcQueue();
@@ -707,7 +841,6 @@ namespace Processus\Lib\JsonRpc2;
                     }
 
                     $rpc = $this->newRpc();
-
 
                     $rpc->getRequest()->setData($rpcDataItem);
 
@@ -755,8 +888,9 @@ namespace Processus\Lib\JsonRpc2;
         }
 
 
-
-
+        /**
+         * @return Gateway
+         */
         protected function _sendResponse()
         {
 
@@ -771,6 +905,8 @@ namespace Processus\Lib\JsonRpc2;
             }
 
             $this->_sendResponseText($responseText);
+
+            return $this;
         }
 
 
@@ -1049,7 +1185,6 @@ namespace Processus\Lib\JsonRpc2;
                 return $responseData;
             }
 
-
             $rpcException = $rpcResponse->getException();
 
             $error = array(
@@ -1177,19 +1312,14 @@ namespace Processus\Lib\JsonRpc2;
             $cryptModuleClassName = '' . $this->getConfigValue(
                 'cryptModuleClassName'
             );
+            $cryptModuleClassName = str_replace(
+                '{{NAMESPACE}}',
+                $this->getApiNamespaceName(),
 
-           if(empty($cryptModuleClassName)) {
-               throw new \Exception(
-                   GatewayErrorType::ERROR_GATEWAYCONFIG_INVALID_CRYPTMODULE
-               );
-           }
-
-            $cryptModuleInstance = RpcUtil::newClassInstanceFromTemplateString(
-                $this,
-                $cryptModuleClassName,
-                array(),
-                false
+                $cryptModuleClassName
             );
+
+            $cryptModuleInstance = new $cryptModuleClassName();
 
             if(!
             ($cryptModuleInstance instanceof
@@ -1256,28 +1386,29 @@ namespace Processus\Lib\JsonRpc2;
             );
         }
 
+
+
+
+
         /**
          * @return Interfaces\AuthModuleInterface
          */
         public function newAuthModule()
         {
 
+
             $authModuleClassName = '' . $this->getConfigValue(
                 'authModuleClassName'
             );
 
-            if(empty($authModuleClassName)) {
-                throw new \Exception(
-                    GatewayErrorType::ERROR_GATEWAYCONFIG_INVALID_AUTHMODULE
-                );
-            }
+            $authModuleClassName = str_replace(
+                '{{NAMESPACE}}',
+                $this->getApiNamespaceName(),
 
-            $authModuleInstance = RpcUtil::newClassInstanceFromTemplateString(
-                $this,
-                $authModuleClassName,
-                array(),
-                false
+                $authModuleClassName
             );
+            $authModuleInstance = new $authModuleClassName();
+
 
             if(!
             ($authModuleInstance instanceof

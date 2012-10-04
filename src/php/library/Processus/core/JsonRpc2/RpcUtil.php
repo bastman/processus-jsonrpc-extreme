@@ -449,6 +449,196 @@ class RpcUtil
         return $instance;
 
     }
+
+
+
+    /**
+     * @param array $data
+     * @param array $signKeys
+     * @param string $appSecret
+     * @param string $signedRequestAlgorithm
+     * @param int|string $issuedAt
+     * @return string
+     */
+    public static function createRequestSignature(
+
+        $data = array(),
+        $signKeys = array(),
+        $appSecret = '',
+        $signedRequestAlgorithm='HMAC-SHA256',
+        $issuedAt = 0
+    )
+    {
+
+        if(!is_int($issuedAt)) {
+            $issuedAt = 0;
+        }
+
+        if (!is_array($data)) {
+            $data = array();
+        }
+        if(!is_array($signKeys)) {
+            $signKeys = array();
+        }
+
+        $signedRequestAlgorithm = strtoupper($signedRequestAlgorithm);
+
+        $_data = array();
+        foreach($signKeys as $key) {
+            $value = null;
+            if(array_key_exists($key, $data)) {
+                $value = $data[$key];
+            }
+            $_data[$key] = $value;
+        }
+        $data = $_data;
+
+        // sort keys
+        uksort($data, 'strcmp');
+
+        $json = (string)self::jsonEncode($data, false);
+
+        $signatureParts =
+            array(
+                (string)strtoupper($signedRequestAlgorithm),
+                (string)$issuedAt,
+                (string)self::base64UrlEncodeUrlSafe($json),
+            );
+
+        $b64Data = self::base64UrlEncodeUrlSafe(implode(
+            '.', $signatureParts
+        ));
+
+        $rawSig = hash_hmac('sha256', $b64Data, $appSecret, $raw = true);
+
+        $sig = (string)implode(
+            '.',
+            array(
+                $signatureParts[0],
+                $signatureParts[1],
+                $rawSig,
+            )
+        );
+
+        $sig = (string)self::base64UrlEncodeUrlSafe($sig);
+
+        return $sig;
+
+    }
+
+    /**
+     * @param string $signature
+     * @param array $data
+     * @param array $signKeys
+     * @param string $appSecret
+     * @param string $signedRequestAlgorithm
+     * @return bool
+     */
+    public static function validateSignedRequest(
+        $signature = '',
+        $data = array(),
+        $signKeys = array(),
+        $appSecret = '',
+        $signedRequestAlgorithm='HMAC-SHA256'
+    ) {
+
+        $result = false;
+
+        if(!is_string($signature)) {
+
+            return $result;
+        }
+
+        $sigGiven = $signature;
+        $sigDecoded = self::base64UrlDecodeUrlSafe($sigGiven);
+
+        list(
+            $algorithmGiven,
+            $issuedAtGiven,
+            $rawSigGiven
+            ) = explode('.', $sigDecoded, 3)
+        ;
+
+        if(!is_string($algorithmGiven)) {
+
+            return $result;
+        }
+
+        if(!is_string($issuedAtGiven)) {
+
+            return $result;
+        }
+
+        if(!is_string($rawSigGiven)) {
+
+            return $result;
+        }
+
+        $issuedAtGiven = (int)$issuedAtGiven;
+        $signedRequestAlgorithm = strtoupper($signedRequestAlgorithm);
+        $algorithmGiven = strtoupper($signedRequestAlgorithm);
+
+        if($algorithmGiven !== $signedRequestAlgorithm) {
+
+            return $result;
+        }
+
+        if(!is_array($data)) {
+            $data = array();
+        }
+        if(!is_array($signKeys)) {
+            $signKeys = array();
+        }
+
+        $signatureExpected = self::createRequestSignature(
+            $data,
+            $signKeys,
+            $appSecret,
+            $signedRequestAlgorithm,
+            $issuedAtGiven
+        );
+
+        $result = ($signatureExpected === $sigGiven);
+
+        return $result;
+    }
+
+
+
+
+    /**
+     * @see: facebook-php-sdk
+     * Base64 encoding that doesn't need to be urlencode()ed.
+     * Exactly the same as base64_encode except it uses
+     *   - instead of +
+     *   _ instead of /
+     *   No padded =
+     *
+     * @param string $input base64UrlEncoded string
+     * @return string
+     */
+    protected static function base64UrlDecodeUrlSafe($input) {
+        return base64_decode(strtr($input, '-_', '+/'));
+    }
+
+    /**
+     * @see: facebook-php-sdk
+     * Base64 encoding that doesn't need to be urlencode()ed.
+     * Exactly the same as base64_encode except it uses
+     *   - instead of +
+     *   _ instead of /
+     *
+     * @param string $input string
+     * @return string base64Url encoded string
+     */
+    protected static function base64UrlEncodeUrlSafe($input) {
+        $str = strtr(base64_encode($input), '+/', '-_');
+        $str = str_replace('=', '', $str);
+        return $str;
+    }
+
+
+
 }
 
 

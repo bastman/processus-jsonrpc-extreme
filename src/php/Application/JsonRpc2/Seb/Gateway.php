@@ -22,9 +22,14 @@ class Gateway
         protected $_config = array(
             'enabled' => true,
             'requestBatchMaxItems' => 100,
+/*
             'serverClassName' => '{{NAMESPACE}}\\Server',
             'authModuleClassName' => '{{NAMESPACE}}\\AuthModule',
             'cryptModuleClassName' => '{{NAMESPACE}}\\CryptModule',
+*/
+            'serverClassName' => '\Application\JsonRpc2\V1\Seb\\Server',
+            'authModuleClassName' => '\Application\JsonRpc2\V1\Seb\\AuthModule',
+            'cryptModuleClassName' => '\Application\JsonRpc2\V1\Seb\\CryptModule',
         );
 
 

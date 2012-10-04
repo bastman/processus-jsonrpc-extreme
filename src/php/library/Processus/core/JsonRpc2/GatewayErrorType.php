@@ -32,6 +32,10 @@ namespace Processus\Lib\JsonRpc2;
         const ERROR_GATEWAY_AUTH_REQUIRED =
             'ERROR_GATEWAY_AUTH_REQUIRED';
 
+        const ERROR_GATEWAY_CRYPT_DECRYPT_REQUEST_FAILED =
+            'ERROR_GATEWAY_CRYPT_DECRYPT_REQUEST_FAILED';
+
+
     }
 
 
