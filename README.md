@@ -136,5 +136,31 @@ JSON-RPC VIA ZEROMQ
 
 
 
+ZeroMQ - Task:
+==============
+
+    public function run()
+    {
+        /* Create new queue object */
+        $queue = new \ZMQSocket(new \ZMQContext(), \ZMQ::SOCKET_PUSH, "MySock1");
+        $queue->connect("tcp://127.0.0.1:5555");
+
+        $rpcData = array(
+            "id"        => 1,
+            "params"    => array(),
+            "method"    => "Seb.Test.ping",         
+        );
+
+        $rpcBatch = array();
+        for ($i=0; $i < 100; $i++) {
+            $rpcData = (array)$rpcData;
+            $rpcData['id'] = $i;
+            $rpcBatch[] =$ rpcData;
+        }
+        $mqData = $rpcBatch;
+        
+        /* Assign socket 1 to the queue, send and receive */
+        $queue->send(json_encode($mqData), \ZMQ::MODE_NOBLOCK);
+    }
 
 
