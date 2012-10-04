@@ -10,8 +10,8 @@ JSON-RPC VIA HTTP
     
     $gateway->run();
     
-    PROFILING MOCKED JSON-RPC VIA HTTP
-    ==================================
+PROFILING MOCKED JSON-RPC VIA HTTP
+==================================
     
     $requestData = array(
         'method' => 'Seb.Test.ping',
