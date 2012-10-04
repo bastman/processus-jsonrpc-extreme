@@ -1,3 +1,16 @@
+OVERVIEW
+========
+
+(1) IN: raw request (via http, zeromq, etc) => gateway (protocol handler: fetch, parse, decrypt, check auth) 
+(2) gateway == RPC => server (router / api) => service
+(3) service == result/exception => server 
+(4) server  == RPC (result,exception) => gateway
+(5) gateway (protocol handler: create response, crypt & sign it) == RAW RESPONSE => OUT (via http, zeromq, etc)
+
+
+
+
+
 JSON-RPC VIA HTTP
 =================
 
